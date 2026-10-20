@@ -107,11 +107,13 @@ def weights(Z, gates, own=None):
     return entmax15(score, dim=-1)
 
 
-def fit(priors, contexts, scale, seeds=SEEDS):
+def fit(priors, contexts, scale, held_out=None, seeds=SEEDS):
     """Fit the gates. `contexts` has one (genes, responses) pair per cell state: the training knockdowns' genes (n,) and
-    responses (n, n_readouts). One gate vector serves every context. Each seed holds out 25% of the genes (the same
-    genes in every context), predicts them from the other genes, and keeps the gates with the lowest held-out loss.
-    Returns the gates (n_seeds, n_priors) and the held-out losses (n_seeds,)."""
+    responses (n, n_readouts), validation knockdowns included. One gate vector serves every context. The held-out genes
+    (the same in every context) are predicted from the other genes, and the gates with the lowest held-out loss are
+    kept. `held_out`: the split's validation genes, as PIE uses them (one fit; they are never partners). Without it,
+    each seed holds out a random 25% of the genes. Returns the gates (n_fits, n_priors) and the held-out loss of every
+    held-out knockdown at the kept gates, pooled over fits."""
     blocks = []
     for genes, R in contexts:
         panel = np.argsort(-np.abs(R).mean(0))[:N_PANEL]  # from every training gene, held-out ones included, as the original fit
@@ -119,8 +121,8 @@ def fit(priors, contexts, scale, seeds=SEEDS):
         blocks.append((genes, Z, torch.from_numpy(R[:, panel].astype(np.float32))))
     all_genes = np.unique(np.concatenate([g for g, _ in contexts]))
     fitted, losses = [], []
-    for seed in seeds:
-        held = all_genes[np.random.default_rng(seed).permutation(len(all_genes)) % 4 == 0]
+    for seed in [None] if held_out is not None else seeds:
+        held = np.asarray(held_out) if seed is None else all_genes[np.random.default_rng(seed).permutation(len(all_genes)) % 4 == 0]
         sets = []
         for genes, Z, R in blocks:
             h = np.isin(genes, held)
@@ -129,35 +131,35 @@ def fit(priors, contexts, scale, seeds=SEEDS):
         gates = torch.zeros(len(priors), requires_grad=True)
         opt = torch.optim.Adam([gates], lr=LR)
 
-        def loss(held_out):
-            err = [
-                ((weights(Zh, gates) @ Rk - Rh) ** 2).mean(1) if held_out else ((weights(Zk, gates, own) @ Rk - Rk) ** 2).mean(1)
+        def loss(on_held):  # one squared error per knockdown
+            return torch.cat([
+                ((weights(Zh, gates) @ Rk - Rh) ** 2).mean(1) if on_held else ((weights(Zk, gates, own) @ Rk - Rk) ** 2).mean(1)
                 for Zk, own, Zh, Rk, Rh in sets
-            ]
-            return torch.cat(err).mean()
+            ])
 
-        best = (np.inf, 0, gates.detach().clone())
+        best = (np.inf, 0, gates.detach().clone(), None)
         for step in range(STEPS):
             if step % EVAL_EVERY == 0:
                 with torch.no_grad():
-                    held_loss = loss(True).item()
-                if held_loss < best[0]:
-                    best = (held_loss, step, gates.detach().clone())
+                    rows = loss(True)
+                if rows.mean().item() < best[0]:
+                    best = (rows.mean().item(), step, gates.detach().clone(), rows.numpy())
                 elif step - best[1] > PATIENCE:
                     break
             opt.zero_grad()
-            loss(False).backward()
+            loss(False).mean().backward()
             opt.step()
             with torch.no_grad():
                 gates.clamp_(min=0)
-        losses.append(best[0])
+        losses.append(best[3])
         fitted.append(best[2])
-    return torch.stack(fitted), np.array(losses)
+    return torch.stack(fitted), np.concatenate(losses)
 
 
 def predict(priors, scale, gates, genes, partners, responses):
-    """Predict `genes` from the measured `partners` of one context (their genes and responses): the partner weights,
-    averaged over seeds, times the partners' responses. Returns the predictions and the weights."""
+    """Predict `genes` from the measured `partners` of one context (their genes and responses; validation knockdowns
+    are not partners): the partner weights, averaged over fits, times the partners' responses. Returns the
+    predictions and the weights."""
     genes, partners = np.asarray(genes), np.asarray(partners)
     Z = standardise(*similarities(priors, genes, partners), scale)
     own = torch.from_numpy(genes[:, None] == partners[None, :])
@@ -194,24 +196,25 @@ def predict_de(W, de, lfc, own=None, tested=None):
     return p_de, fold
 
 
-def rfe(priors, contexts):
+def rfe(priors, contexts, held_out=None):
     """Recursive feature elimination over the priors ({name: prior}): fit all gates, drop the prior with the smallest
-    gate, refit, until one prior is left. Returns the path, one dict per step: priors kept, gates, scale, losses."""
+    gate, refit, until one prior is left. `held_out` as in `fit`. Returns the path, one dict per step: priors kept,
+    gates, scale, and the held-out loss of every held-out knockdown."""
     names = list(priors)
     full_scale = fit_scale(list(priors.values()), [g for g, _ in contexts])
     kept, path = list(range(len(names))), []
     while kept:
         scale = tuple(s[kept] for s in full_scale)
-        gates, losses = fit([priors[names[i]] for i in kept], contexts, scale)
+        gates, losses = fit([priors[names[i]] for i in kept], contexts, scale, held_out)
         path.append({"priors": [names[i] for i in kept], "gates": gates, "scale": scale, "losses": losses})
         kept.pop(int(gates.mean(0).argmin()))
     return path
 
 
 def choose(path):
-    """The smallest set whose held-out loss is within one standard error (over seeds) of the fit on all priors.
-    R032-marson-rfe chose the size from development test scores; this uses only the training genes' held-out loss,
-    the rule R031-replogle-rfe intended, so no test row decides the model."""
+    """The smallest set whose held-out loss is within one standard error (over held-out knockdowns) of the fit on all
+    priors. R032-marson-rfe chose the size from development test scores; this uses only held-out training or
+    validation knockdowns, the rule R031-replogle-rfe intended, so no test row decides the model."""
     full = path[0]["losses"]
     bar = full.mean() + (full.std(ddof=1) / np.sqrt(len(full)) if len(full) > 1 else 0)
     return min((p for p in path if p["losses"].mean() <= bar), key=lambda p: len(p["priors"]))
@@ -229,9 +232,15 @@ if __name__ == "__main__":  # self-check on synthetic priors
     train, test = genes[:70], genes[70:]
 
     path = rfe(priors, [(train, responses[:70])])
+    assert path[0]["gates"].shape == (5, 2) and len(path[0]["losses"]) > 70  # 5 seeds, held-out rows pooled
+
+    # early stopping on a fixed validation set: one fit, one loss per validation knockdown
+    gates_v, losses_v = fit(list(priors.values()), [(train, responses[:70])], path[0]["scale"], held_out=train[:14])
+    assert gates_v.shape == (1, 2) and losses_v.shape == (14,) and gates_v[0, 0] > gates_v[0, 1]
     gates, scale = path[0]["gates"], path[0]["scale"]
     assert (gates >= 0).all() and (gates[:, 0] > gates[:, 1]).all(), gates
     assert path[-1]["priors"] == ["informative"] and choose(path) in path
+    assert choose([{"priors": ["a"], "losses": np.array([1.0])}])["priors"] == ["a"]
 
     pred, W = predict(list(priors.values()), scale, gates, test, train, responses[:70])
     assert np.allclose(W.sum(1), 1, atol=1e-5)
@@ -246,4 +255,4 @@ if __name__ == "__main__":  # self-check on synthetic priors
     de = np.abs(responses[:70]) > 2
     p_de, fold = predict_de(W, de, responses[:70])
     assert ((p_de >= 0) & (p_de < 1)).all() and ((p_de >= 0.5).sum(1) == np.rint(W @ de.sum(1))).all()
-    print("pwpa.py self-check ok:", [(p["priors"], p["losses"].mean().round(3)) for p in path])
+    print("pwpa.py self-check ok:", [(p["priors"], round(float(p["losses"].mean()), 3)) for p in path])

@@ -36,4 +36,4 @@ Similarities are z-scored over the training pairs, so that a gate means the same
 Every refit works the same way.
 Each training knockdown is predicted from the other training knockdowns, and Adam minimises the squared error on the 300 genes that respond most.
 Gates start at 0 and never go below it.
-Each of 5 seeds holds out a different 25% of the genes and keeps the gates with the lowest held-out loss.
+The fit stops early on the split's validation knockdowns, the same ones PIE stops on, which are never partners. Without a validation set, each of 5 seeds holds out a different 25% of the genes instead.
