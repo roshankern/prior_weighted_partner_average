@@ -1,0 +1,7 @@
+# large data live outside git (see utils/paths.py)
+data/
+
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store

@@ -1,0 +1,11 @@
+dataset	reference	context	species	used_in	url
+replogle_k562	Replogle et al. 2022	K562 leukaemia line	human	2.train_test	TODO(orcd)
+replogle_rpe1	Replogle et al. 2022	RPE1 retinal epithelial line	human	2.train_test	TODO(orcd)
+nadig_hepg2	Nadig et al. 2025	HepG2 liver cancer line	human	2.train_test	TODO(orcd)
+nadig_jurkat	Nadig et al. 2025	Jurkat T-cell line, resting	human	2.train_test	TODO(orcd)
+kolf_ipsc	Nourreddine et al. 2026	KOLF2.1J iPSC	human	2.train_test	TODO(orcd)
+vcc_h1	Roohani et al. 2025 (Virtual Cell Challenge)	H1 hESC	human	2.train_test	TODO(orcd)
+shi_brain	Shi et al. 2026	mouse brain in vivo, 3 neuron types	mouse	2.train_test	TODO(orcd)
+geiger_bmdc	Geiger-Schuller et al. 2026	mouse dendritic cells, LPS-stimulated	mouse	2.train_test	TODO(orcd)
+pie_replogle_nadig	Verma et al. 2026 (PIE)	PIE's processed arrays: K562, RPE1, HepG2, Jurkat	human	2.train_test	TODO(orcd)
+marson	Zhu et al. 2026	primary CD4+ T cells at rest, 8 h and 48 h after stimulation	human	3.further_analysis	TODO(orcd)

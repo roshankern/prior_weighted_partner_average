@@ -1,0 +1,23 @@
+[project]
+name = "prior-weighted-partner-average"
+version = "0.1.0"
+description = "Predict unmeasured gene knockdowns as a prior-weighted average of measured ones"
+license = "BSD-3-Clause"
+requires-python = ">=3.11"
+# TODO(orcd): pin to the versions in the environment that produced the results
+# (rotation_project/txpert-baseline/.venv: `pip freeze`), then run `uv lock` and commit uv.lock.
+dependencies = [
+    "anndata",
+    "entmax",
+    "ipykernel",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "pyarrow",
+    "scanpy",
+    "scipy",
+    "torch",
+]
+
+[tool.uv]
+package = false

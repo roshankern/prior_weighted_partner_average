@@ -1,0 +1,37 @@
+model	metric	mean	se	source
+context_mean	binary_auprc	0.082	0.0045	PIE Table 4
+context_mean	sig_jaccard	0.063	0.0055	PIE Table 4
+context_mean	direction_match	0.675	0.0125	PIE Table 4
+context_mean	spearman_nsig			PIE Table 4
+context_mean	spearman_lfc	0.372	0.0175	PIE Table 4
+context_mean	discrimination_score_l1	0.503	0.0	PIE Table 4
+compass_n	binary_auprc	0.092	0.005	PIE Table 4
+compass_n	sig_jaccard	0.083	0.0045	PIE Table 4
+compass_n	direction_match	0.748	0.0045	PIE Table 4
+compass_n	spearman_nsig	0.336	0.011	PIE Table 4
+compass_n	spearman_lfc	0.438	0.012	PIE Table 4
+compass_n	discrimination_score_l1	0.645	0.004	PIE Table 4
+presage	binary_auprc	0.091	0.005	PIE Table 4
+presage	sig_jaccard	0.080	0.0045	PIE Table 4
+presage	direction_match	0.745	0.011	PIE Table 4
+presage	spearman_nsig	0.370	0.0355	PIE Table 4
+presage	spearman_lfc	0.444	0.0125	PIE Table 4
+presage	discrimination_score_l1	0.633	0.007	PIE Table 4
+tabicl	binary_auprc	0.094	0.005	PIE Table 4
+tabicl	sig_jaccard	0.085	0.005	PIE Table 4
+tabicl	direction_match	0.769	0.011	PIE Table 4
+tabicl	spearman_nsig	0.442	0.0125	PIE Table 4
+tabicl	spearman_lfc	0.469	0.018	PIE Table 4
+tabicl	discrimination_score_l1	0.682	0.005	PIE Table 4
+pie	binary_auprc	0.304	0.0115	PIE Table 4
+pie	sig_jaccard	0.168	0.0055	PIE Table 4
+pie	direction_match	0.775	0.011	PIE Table 4
+pie	spearman_nsig	0.525	0.015	PIE Table 4
+pie	spearman_lfc	0.552	0.011	PIE Table 4
+pie	discrimination_score_l1	0.709	0.003	PIE Table 4
+pwpa	binary_auprc	0.332291	0.012109	K031-pie-five
+pwpa	sig_jaccard	0.184216	0.003114	K031-pie-five
+pwpa	direction_match	0.785114	0.005544	K031-pie-five
+pwpa	spearman_nsig	0.593045	0.007252	K031-pie-five
+pwpa	spearman_lfc	0.524875	0.016872	K031-pie-five
+pwpa	discrimination_score_l1	0.704025	0.003011	K031-pie-five
