@@ -4,11 +4,15 @@ This repository trains and evaluates PWPA, a model that predicts the transcripti
 PWPA predicts the response to an unmeasured knockdown as a weighted average of the knockdowns measured in the same cell context, with weights set by prior knowledge of which genes behave alike.
 We compare it with PIE[^1] on PIE's own benchmark and on eight Perturb-seq datasets.
 
+![Main figure](2.train_test/figures/main_figure.png)
+
+> **Figure 1.** (A) How PWPA is trained. Each prior gets one gate, and the gates weigh the partner average that predicts each training knockdown from the others. Recursive feature elimination (RFE) drops the prior with the smallest gate and refits, and the size is the smallest set whose held-out loss is within one standard error of the fit on all priors.
+> (B) PWPA and the models in PIE's paper on PIE's benchmark of unseen knockdowns in seen contexts (Replogle–Nadig, four cell lines), with PIE's splits and metric code. The first five models are PIE's published values. PWPA uses PIE's five genetic knowledge sources as its priors. Mean over 4 folds ± 1 standard error.
+<!-- TODO(orcd): PWPA in B is K031-pie-five, fitted with the earlier L1 penalty and shuffled decoys; rerun 2.train_test/0.pie_benchmark.ipynb with RFE -->
+
 ## Approach
 
-![PWPA architecture](1.model/figures/architecture.png)
-
-Each prior dataset, such as a gene network, a CRISPR screen or a gene-set collection, gives a similarity between two genes on a common scale.
+Each prior dataset, such as a gene network, a protein embedding or a CRISPR screen, gives a similarity between two genes on a common scale.
 One gate per prior weighs these similarities into a pair score, and entmax turns the scores into sparse weights over the measured knockdowns:
 
 ```text
@@ -18,17 +22,7 @@ prediction(t) = Σ_j weight(t, j) · response(j)      t's own knockdown is never
 ```
 
 The gates are the only fitted numbers.
-Recursive feature elimination (RFE) chooses the priors: fit all gates, drop the prior with the smallest gate, refit, and keep the smallest set whose held-out loss is within one standard error of the all-priors fit.
-
-## Results
-
-<!-- TODO(orcd): PWPA here is K031-pie-five, fitted with the earlier L1 penalty and shuffled decoys; rerun 2.train_test/0.pie_benchmark.ipynb with RFE -->
-![PIE benchmark](2.train_test/figures/pie_benchmark.png)
-
-> PWPA and the models in PIE's paper on PIE's benchmark of unseen knockdowns in seen contexts (Replogle–Nadig, four cell lines), with PIE's splits and metric code.
-> PWPA uses PIE's five genetic knowledge sources as its priors.
-> The first five bars are PIE's published values.
-> [`2.train_test`](2.train_test/) also retrains PIE on eight Perturb-seq datasets and compares the two there.
+[`2.train_test`](2.train_test/) also retrains PIE on eight Perturb-seq datasets and compares the two there.
 
 ## Modules
 

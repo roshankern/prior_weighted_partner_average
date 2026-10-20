@@ -24,7 +24,7 @@ The context mean, the baseline, predicts the mean training knockdown of the cont
 ## PIE's benchmark
 
 <!-- TODO(orcd): PWPA here is K031-pie-five, fitted with the earlier L1 penalty and shuffled decoys; rerun 0.pie_benchmark.ipynb with RFE -->
-![PIE benchmark](figures/pie_benchmark.png)
+![PIE benchmark](figures/main_figure.png)
 
 > Unseen knockdowns in seen contexts (Replogle–Nadig, four cell lines), with PIE's processed arrays, splits and metric code.
 > The first five bars are PIE's published values.
