@@ -3,6 +3,7 @@
 This repository trains and evaluates PWPA, a model that predicts the transcriptional response to a gene knockdown that has not been measured in a cell context.
 PWPA predicts the response to an unmeasured knockdown as a weighted average of the knockdowns measured in the same cell context, with weights set by prior knowledge of which genes behave alike.
 We compare it with PIE[^1] on PIE's own benchmark and on eight Perturb-seq datasets.
+Each prior dataset, such as a gene network, a protein embedding or a CRISPR screen, gives a similarity between two genes on a common scale.
 
 ![Main figure](2.train_test/figures/main_figure.png)
 
@@ -10,41 +11,33 @@ We compare it with PIE[^1] on PIE's own benchmark and on eight Perturb-seq datas
 > (B) PWPA and the models in PIE's paper on PIE's benchmark of unseen knockdowns in seen contexts (Replogle–Nadig, four cell lines), with PIE's splits and metric code. The first five models are PIE's published values. PWPA uses PIE's five genetic knowledge sources as its priors. Mean over 4 folds ± 1 standard error.
 <!-- TODO(orcd): PWPA in B is K031-pie-five, fitted with the earlier L1 penalty and shuffled decoys; rerun 2.train_test/0.pie_benchmark.ipynb with RFE -->
 
-## Approach
-
-Each prior dataset, such as a gene network, a protein embedding or a CRISPR screen, gives a similarity between two genes on a common scale.
-One gate per prior weighs these similarities into a pair score, and entmax turns the scores into sparse weights over the measured knockdowns:
-
-```text
-score(t, j)   = Σ_d gate_d · similarity_d(t, j)     one gate ≥ 0 per prior
-weight(t, ·)  = entmax(score(t, ·))                 sparse, sums to 1
-prediction(t) = Σ_j weight(t, j) · response(j)      t's own knockdown is never a partner
-```
-
-The gates are the only fitted numbers.
-[`2.train_test`](2.train_test/) also retrains PIE on eight Perturb-seq datasets and compares the two there.
-
 ## Modules
 
 | Module | What it does |
 |---|---|
 | [`0.datasets`](0.datasets/) | Download the Perturb-seq datasets and prior sources, process them with PIE's pipeline, and split the knocked-down genes into folds |
 | [`1.model`](1.model/) | The model ([`pwpa.py`](1.model/pwpa.py)) and the notebook that turns each prior source into a gene-by-gene similarity |
-| [`2.train_test`](2.train_test/) | Train and score PWPA and PIE on PIE's benchmark and on eight Perturb-seq datasets |
-| [`3.further_analysis`](3.further_analysis/) | Extensions: the partners and priors behind a prediction, the gene regulatory network the model implies, and the cost of training |
+| [`2.train_test`](2.train_test/) | Train and score PWPA and PIE on PIE's benchmark and on eight Perturb-seq datasets, and compare their training cost |
+| [`3.further_analysis`](3.further_analysis/) | Extensions: the partners and priors behind a prediction, and the gene regulatory network the model implies |
+| [`4.experiment_log`](4.experiment_log/) | Notes on the ~580 LLM-driven experiment runs that led to PWPA |
 
 ```mermaid
 flowchart LR
-    P[("Public Perturb-seq data<br/>and prior sources")] --> D["<b>0</b> datasets<br/>download, process, split"]
-    D --> M["<b>1</b> model<br/>prior similarities"]
-    D --> T["<b>2</b> train_test<br/>PWPA and PIE"]
+    P[("Public Perturb-seq data<br/>and prior sources")] --> D["0 · datasets<br/>download, process, split"]
+    D --> M["1 · model<br/>prior similarities"]
+    D --> T["2 · train_test<br/>PWPA and PIE, cost"]
     M --> T
-    D --> F["<b>3</b> further_analysis<br/>partners, network, cost"]
+    D --> F["3 · further_analysis<br/>partners, network"]
     M --> F
 ```
 
 Each module's README lists its notebooks in the order to run them.
 Shared Python code lives in [`utils/`](utils/).
+
+PWPA came out of an autonomous, LLM-driven lab loop: Claude agents planned, ran and logged about 580 experiment runs (arms and controls) over nine sessions in September–October 2026.
+[`4.experiment_log`](4.experiment_log/) distills them for future LLM agents (and people): what each experiment tested, how it was set up, what it found, and which ideas failed.
+Read it before planning new experiments, so they build on these results instead of repeating them.
+Its numbers come from the lab's own code, not from this repository's notebooks.
 
 ## Data
 
@@ -53,26 +46,36 @@ The notebooks find the data root through [`utils/paths.py`](utils/paths.py), whi
 Set the `PWPA_DATA_DIR` environment variable to use another root.
 Git ignores `data/`.
 
-| Folder in the data root | Contents | Written by | Read by |
-|---|---|---|---|
-| `perturbseq/raw/` | Downloaded counts of each Perturb-seq dataset | 0 | 0 |
-| `perturbseq/processed/` | Each dataset after PIE's pipeline: expression change, DE calls and fold changes per knockdown | 0 | 2, 3 |
-| `pie_benchmark/` | PIE's released Replogle–Nadig arrays | 0 | 2 |
-| `priors/raw/` | Downloaded prior sources | 0 | 1 |
-| `priors/profile/`, `priors/network/` | Each prior in the form [`pwpa.py`](1.model/pwpa.py) reads | 1 | 2, 3 |
-| `predictions/` | Predictions of every model, per dataset and fold | 2 | 2 |
+| Folder in the data root | Contents |
+|---|---|
+| `perturbseq/raw/` | Downloaded counts of each Perturb-seq dataset |
+| `perturbseq/processed/` | Each dataset after PIE's pipeline: expression change, DE calls and fold changes per knockdown |
+| `pie_benchmark/` | PIE's released Replogle–Nadig arrays |
+| `priors/raw/` | Downloaded prior sources |
+| `priors/profile/`, `priors/network/` | Each prior in the form [`pwpa.py`](1.model/pwpa.py) reads |
+| `predictions/` | Predictions of every model, per dataset and fold |
 
 ## Setup
 
-Python (3.11 or later) uses [uv](https://docs.astral.sh/uv/).
-Install the environment from `pyproject.toml`, then register a Jupyter kernel for the notebooks:
+Give this to a coding agent, or follow it yourself:
 
-```bash
-uv sync
-uv run python -m ipykernel install --user --name pwpa --display-name pwpa
+```text
+Set up this repository:
+1. With uv (https://docs.astral.sh/uv/), run `uv sync`. It installs Python 3.12 and the pinned packages.
+   Register the notebook kernel: `uv run python -m ipykernel install --user --name pwpa --display-name pwpa`.
+2. Check the model: `uv run python 1.model/pwpa.py` must print "pwpa.py self-check ok".
+3. Set PWPA_DATA_DIR to a folder with room for the downloads (about 350 GB: Perturb-seq data, and 43 GB of PIE's priors).
+   The default is data/ in the repository, which git ignores.
+4. PIE needs its own environment and a CUDA GPU. Build it, with its `pie` kernel, as in 2.train_test/README.md (Environments).
+   It runs 2.train_test/1.train_pie.ipynb, PIE's runs in 2.train_test/4.training_cost.ipynb, and `pie process` in
+   0.datasets (set PIE_BIN to its `pie` executable). Notebooks that score with PIE's metrics run in the pwpa kernel
+   with PIE's src/ on PYTHONPATH.
+5. Run the modules in order (0.datasets, 1.model, 2.train_test, 3.further_analysis), and the notebooks of each in the order its README lists.
+   Headless: `uv run jupyter nbconvert --to notebook --execute --output-dir <runs folder> <notebook>`.
+   Notebooks that loop over datasets or folds read DATASETS and FOLDS (comma-separated), so each can be a parallel job.
+   Fold 4 of every split is held out until the end: never fit or score on it during development.
 ```
 
-PIE runs in its own environment, built from [ArcInstitute/pie](https://github.com/ArcInstitute/pie) at commit `21a526a`, and training it needs a GPU.
 PWPA trains on CPUs.
 
 ## License

@@ -16,6 +16,7 @@ Self-check on synthetic priors: python pwpa.py
 """
 
 import pathlib
+import time
 
 import numpy as np
 import pandas as pd
@@ -107,13 +108,15 @@ def weights(Z, gates, own=None):
     return entmax15(score, dim=-1)
 
 
-def fit(priors, contexts, scale, held_out=None, seeds=SEEDS):
+def fit(priors, contexts, scale, held_out=None, seeds=SEEDS, trace=None):
     """Fit the gates. `contexts` has one (genes, responses) pair per cell state: the training knockdowns' genes (n,) and
     responses (n, n_readouts), validation knockdowns included. One gate vector serves every context. The held-out genes
     (the same in every context) are predicted from the other genes, and the gates with the lowest held-out loss are
     kept. `held_out`: the split's validation genes, as PIE uses them (one fit; they are never partners). Without it,
     each seed holds out a random 25% of the genes. Returns the gates (n_fits, n_priors) and the held-out loss of every
-    held-out knockdown at the kept gates, pooled over fits."""
+    held-out knockdown at the kept gates, pooled over fits. `trace`: a list that gets (seconds since the fit started,
+    step, gates) at every evaluation."""
+    start = time.perf_counter()
     blocks = []
     for genes, R in contexts:
         panel = np.argsort(-np.abs(R).mean(0))[:N_PANEL]  # from every training gene, held-out ones included, as the original fit
@@ -140,6 +143,8 @@ def fit(priors, contexts, scale, held_out=None, seeds=SEEDS):
         best = (np.inf, 0, gates.detach().clone(), None)
         for step in range(STEPS):
             if step % EVAL_EVERY == 0:
+                if trace is not None:
+                    trace.append((time.perf_counter() - start, step, gates.detach().clone()))
                 with torch.no_grad():
                     rows = loss(True)
                 if rows.mean().item() < best[0]:
@@ -196,16 +201,29 @@ def predict_de(W, de, lfc, own=None, tested=None):
     return p_de, fold
 
 
-def rfe(priors, contexts, held_out=None):
+def _remember(prior):
+    """The prior, computed once per pair of gene arrays (by identity; the cache keeps them alive, so ids are not reused)."""
+    seen = {}
+
+    def remembered(a, b):
+        if (id(a), id(b)) not in seen:
+            seen[id(a), id(b)] = a, b, prior(a, b)
+        return seen[id(a), id(b)][2]
+
+    return remembered
+
+
+def rfe(priors, contexts, held_out=None, trace=None):
     """Recursive feature elimination over the priors ({name: prior}): fit all gates, drop the prior with the smallest
-    gate, refit, until one prior is left. `held_out` as in `fit`. Returns the path, one dict per step: priors kept,
-    gates, scale, and the held-out loss of every held-out knockdown."""
+    gate, refit, until one prior is left. `held_out` as in `fit`; `trace` as in `fit`, for the first fit (all priors).
+    Returns the path, one dict per step: priors kept, gates, scale, and the held-out loss of every held-out knockdown."""
     names = list(priors)
+    priors = {name: _remember(prior) for name, prior in priors.items()}  # every step asks for the same similarities
     full_scale = fit_scale(list(priors.values()), [g for g, _ in contexts])
     kept, path = list(range(len(names))), []
     while kept:
         scale = tuple(s[kept] for s in full_scale)
-        gates, losses = fit([priors[names[i]] for i in kept], contexts, scale, held_out)
+        gates, losses = fit([priors[names[i]] for i in kept], contexts, scale, held_out, trace=None if path else trace)
         path.append({"priors": [names[i] for i in kept], "gates": gates, "scale": scale, "losses": losses})
         kept.pop(int(gates.mean(0).argmin()))
     return path
@@ -235,11 +253,15 @@ if __name__ == "__main__":  # self-check on synthetic priors
     assert path[0]["gates"].shape == (5, 2) and len(path[0]["losses"]) > 70  # 5 seeds, held-out rows pooled
 
     # early stopping on a fixed validation set: one fit, one loss per validation knockdown
-    gates_v, losses_v = fit(list(priors.values()), [(train, responses[:70])], path[0]["scale"], held_out=train[:14])
+    trace = []
+    gates_v, losses_v = fit(list(priors.values()), [(train, responses[:70])], path[0]["scale"], held_out=train[:14], trace=trace)
+    assert [s for _, s, _ in trace[:2]] == [0, EVAL_EVERY] and trace[0][2].shape == (2,)
     assert gates_v.shape == (1, 2) and losses_v.shape == (14,) and gates_v[0, 0] > gates_v[0, 1]
     gates, scale = path[0]["gates"], path[0]["scale"]
     assert (gates >= 0).all() and (gates[:, 0] > gates[:, 1]).all(), gates
     assert path[-1]["priors"] == ["informative"] and choose(path) in path
+    remembered = _remember(priors["noise"])
+    assert remembered(train, train) is remembered(train, train) and np.array_equal(remembered(train, test)[0], priors["noise"](train, test)[0])
     assert choose([{"priors": ["a"], "losses": np.array([1.0])}])["priors"] == ["a"]
 
     pred, W = predict(list(priors.values()), scale, gates, test, train, responses[:70])
