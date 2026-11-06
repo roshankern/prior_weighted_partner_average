@@ -34,10 +34,9 @@ flowchart LR
 Each module's README lists its notebooks in the order to run them.
 Shared Python code lives in [`utils/`](utils/).
 
-PWPA came out of an autonomous, LLM-driven lab loop: Claude agents planned, ran and logged about 580 experiment runs (arms and controls) over nine sessions in September–October 2026.
-[`4.experiment_log`](4.experiment_log/) distills them for future LLM agents (and people): what each experiment tested, how it was set up, what it found, and which ideas failed.
-Read it before planning new experiments, so they build on these results instead of repeating them.
-Its numbers come from the lab's own code, not from this repository's notebooks.
+The engineering of PWPA was assisted by an autonomous, LLM-driven lab loop.
+These notes record what that loop tried and found.
+They are written mainly for future LLM agents that work on this repository or on similar problems.
 
 ## Data
 
