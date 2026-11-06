@@ -35,8 +35,8 @@ Each module's README lists its notebooks in the order to run them.
 Shared Python code lives in [`utils/`](utils/).
 
 The engineering of PWPA was assisted by an autonomous, LLM-driven lab loop.
-These notes record what that loop tried and found.
-They are written mainly for future LLM agents that work on this repository or on similar problems.
+[`4.experiment_log`](4.experiment_log/) records what that loop tried and found.
+It is written mainly for future LLM agents that work on this repository or on similar problems.
 
 ## Data
 
