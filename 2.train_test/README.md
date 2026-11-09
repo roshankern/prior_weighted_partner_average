@@ -24,7 +24,6 @@ The context mean, the baseline, predicts the mean training knockdown of the cont
 
 ## PIE's benchmark
 
-<!-- TODO(orcd): PWPA here is K031-pie-five, fitted with the earlier L1 penalty and shuffled decoys; rerun 0.pie_benchmark.ipynb with RFE -->
 ![PIE benchmark](figures/main_figure.png)
 
 > Unseen knockdowns in seen contexts (Replogle–Nadig, four cell lines), with PIE's processed arrays, splits and metric code.
@@ -33,7 +32,6 @@ The context mean, the baseline, predicts the mean training knockdown of the cont
 
 ## Eight datasets
 
-<!-- TODO(orcd): PWPA rows are from gates fitted on PIE's five genetic sources without RFE; rerun 2.train_pwpa.ipynb -->
 ![PIE and PWPA on eight datasets](figures/eight_datasets.png)
 
 > Every dataset goes through PIE's pipeline before any model sees it, and every model gets the same training, validation and test knockdowns.
@@ -54,8 +52,9 @@ The context mean, the baseline, predicts the mean training knockdown of the cont
 > One fold of PIE's benchmark (`unseen_pert/k562`: HepG2, Jurkat and RPE1), trained on 10%, 25%, 50% and 100% of its training knockdowns; validation and test knockdowns stay the same.
 > Cost is for the full training set. PIE trains on one L40S GPU, and PWPA on CPUs only.
 > AWS on-demand prices: $1.861 per GPU-hour (g6e.xlarge) and $0.0446 per CPU core-hour (c7i).
-> Left: validation AUPRC against training time; PWPA's curve follows its first fit, on all five priors, and its later RFE fits count in its cost but not on the curve.
+> Left: test AUPRC against training time, scored at every validation. The dot is the model each keeps: PIE's checkpoint with the best validation AUPRC, and PWPA's RFE choice at the end of its training. PWPA's curve follows its first fit, on all five priors.
 > Right: test AUPRC against the number of training knockdowns. b is the context mean.
+> Shading: 95% bootstrap interval over test knockdowns, resampled within each cell line.
 
 ## Environments
 

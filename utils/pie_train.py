@@ -7,6 +7,7 @@ PIE's code, as K062-pie-eight/train_pie.py: at most 2,000 steps (the learning ra
 run is the recipe's first 2,000 steps), and early stopping after 6 validations without a better AUPRC.
 """
 
+import errno
 import os
 import resource
 import time
@@ -33,10 +34,12 @@ def cpu_seconds():
 
 
 class ValidationLog(Callback):
-    """Appends step, seconds since `start` and validation AUPRC to a CSV at every validation."""
+    """Appends step, seconds since `start` and validation AUPRC to a CSV at every validation, and with `steps`, saves
+    a checkpoint there as steps/<step>.ckpt. Saving those is not part of PIE's recipe, so its time (`paused`) is left
+    out of the seconds."""
 
-    def __init__(self, path, start):
-        self.path, self.start = Path(path), start
+    def __init__(self, path, start, steps=False):
+        self.path, self.start, self.steps, self.paused = Path(path), start, steps, 0.0
 
     def on_validation_end(self, trainer, module):
         if trainer.sanity_checking:
@@ -44,7 +47,13 @@ class ValidationLog(Callback):
         if not self.path.exists():
             self.path.write_text("step,seconds,val_binary_auprc\n")
         with self.path.open("a") as f:
-            f.write(f"{trainer.global_step},{time.perf_counter() - self.start:.3f},{trainer.callback_metrics[T.MONITOR].item()}\n")
+            f.write(f"{trainer.global_step},{time.perf_counter() - self.start - self.paused:.3f},"
+                    f"{trainer.callback_metrics[T.MONITOR].item()}\n")
+        if self.steps:
+            t = time.perf_counter()
+            (self.path.parent / "steps").mkdir(exist_ok=True)
+            trainer.save_checkpoint(self.path.parent / "steps" / f"{trainer.global_step}.ckpt")
+            self.paused += time.perf_counter() - t
 
 
 def _env(run_dir):
@@ -53,20 +62,26 @@ def _env(run_dir):
                       PIE_DATA_ROOT=str(data_dir("priors", "raw")), WANDB_ENTITY="unused", WANDB_PROJECT="unused")
 
 
-def train(run_dir, preprocessed, split_dir, resume=True):
+def train(run_dir, preprocessed, split_dir, resume=True, steps=False):
     """Train PIE on split_dir's train.json, stopping on its val.json, into run_dir (checkpoints, csv/, and
-    validations.csv). Resumes from run_dir/last.ckpt when there is one and `resume`; otherwise starts over.
+    validations.csv; with `steps`, a checkpoint at every validation in steps/). Resumes from run_dir/last.ckpt when there is one and `resume`, and returns at once when the run
+    has finished (run_dir/trained); otherwise starts over.
     Returns the wall and CPU seconds (this process and its children) of this call."""
     run_dir = Path(run_dir)
     start, cpu = time.perf_counter(), cpu_seconds()
+    trained = run_dir / "trained"  # marks a finished run, so a rerun after a later crash goes straight to predict
+    if resume and trained.is_file():
+        return 0.0, 0.0
+    trained.unlink(missing_ok=True)
     resume = resume and (run_dir / "last.ckpt").is_file() and (run_dir / "data_stats.json").is_file()
     if not resume:
         (run_dir / "validations.csv").unlink(missing_ok=True)
+    log = ValidationLog(run_dir / "validations.csv", start, steps)
 
     def build_trainer(cfg, rd, logger):
         trainer = _build_trainer(cfg, rd, logger)
         trainer.callbacks.extend([EarlyStopping(monitor=T.MONITOR, mode="max", patience=6, check_on_train_epoch_end=False),
-                                  ValidationLog(run_dir / "validations.csv", start)])
+                                  log])
         return trainer
 
     T.build_trainer = build_trainer
@@ -81,13 +96,23 @@ def train(run_dir, preprocessed, split_dir, resume=True):
         f"scheduler.warmup_fraction={250 / STEPS}",  # keeps the recipe's 250 warmup steps
         "logger.enabled=true", "logger.group=null", "logger.tags=[]",
     ]))
-    return time.perf_counter() - start, cpu_seconds() - cpu
+    trained.touch()
+    return time.perf_counter() - start - log.paused, cpu_seconds() - cpu  # shortcut: CPU seconds keep the step saves, which are mostly I/O; subtract them if they ever show
 
 
-def predict(run_dir, rows_json, path):
-    """Predict the rows of a split file with run_dir's best checkpoint, with the run's training knockdowns as
+def predict(run_dir, rows_json, path, ckpt="best_auprc.ckpt"):
+    """Predict the rows of a split file with a checkpoint of run_dir (by default its best), with the run's training knockdowns as
     evidence, into a parquet in PIE's prediction format."""
     run_dir = Path(run_dir)
     _env(run_dir)
-    preds = predict_loaded(load_checkpoint(run_dir / "best_auprc.ckpt"), RowSource("split", Path(rows_json)), None, "cuda")
+    for attempt in range(10):
+        try:
+            loaded = load_checkpoint(run_dir / ckpt)
+            break
+        except OSError as e:  # ORCD's NFS scratch can answer EBUSY on a checkpoint that training has just written
+            if e.errno != errno.EBUSY or attempt == 9:
+                raise
+            print(f"{run_dir}: checkpoint busy, retry {attempt + 1} in 60 s", flush=True)
+            time.sleep(60)
+    preds = predict_loaded(loaded, RowSource("split", Path(rows_json)), None, "cuda")
     write_predictions_parquet(preds, Path(path))

@@ -84,6 +84,30 @@ def read_predictions(path, d):
 def pie_metrics(d, rows, p_de, lfc, delta):
     """PIE's six metrics of predictions for these rows of d: the mean over contexts, NaN skipped (the 'all' row of
     PIE's metrics_table)."""
+    return pd.Series(_score(d, rows, p_de, lfc, delta).context_mean)[METRICS].astype(float)  # = the 'all' row of pie.evaluate.metrics_table
+
+
+def pair_auprc(d, rows, p_de, lfc, delta):
+    """PIE's AUPRC of each (context, knockdown): a Series on that MultiIndex. Its mean per context, then over contexts,
+    is pie_metrics' binary_auprc."""
+    pairs = _score(d, rows, p_de, lfc, delta).per_pair
+    return pairs.set_index(["context", "perturbation"]).binary_auprc.astype(float)
+
+
+def bootstrap(*pairs, n=1000, seed=0):
+    """95% intervals of PIE's AUPRC (mean over contexts of the mean over knockdowns) from pair_auprc Series, resampling
+    knockdowns within each context. Several Series on the same pairs share the resamples, so the interval of their
+    difference is paired. Returns (n, len(pairs)) resampled AUPRCs; take np.percentile(..., [2.5, 97.5], axis=0)."""
+    table = pd.concat(pairs, axis=1, join="inner")
+    rng = np.random.default_rng(seed)
+    out = 0
+    groups = [g.to_numpy() for _, g in table.groupby(level="context")]
+    for g in groups:
+        out = out + g[rng.integers(0, len(g), (n, len(g)))].mean(1) / len(groups)
+    return out
+
+
+def _score(d, rows, p_de, lfc, delta):
     try:  # PIE's code, imported here so that loading works without PIE
         from pie.metrics import ScoringInputs, score
     except ModuleNotFoundError as e:
@@ -96,10 +120,9 @@ def pie_metrics(d, rows, p_de, lfc, delta):
         from pie.metrics import ScoringInputs, score
 
     rows = np.asarray(rows)
-    result = score([ScoringInputs(
+    return score([ScoringInputs(
         dataset=d.name, genes=d.genes, contexts=d.context[rows].tolist(), perts=d.pert[rows].tolist(),
         p_de=np.asarray(p_de, np.float32), lfc_pred=np.asarray(lfc, np.float32), delta_p_pred=np.asarray(delta, np.float32),
         de_true=d.de[rows], tested=np.asarray(d.tested[rows], bool), lfc_true=np.asarray(d.lfc[rows], np.float64),
         delta_p_true=np.asarray(d.delta[rows], np.float32), ctrl_means=np.asarray(d.ctrl, np.float32)[d.ctx_ids[rows]],
     )])
-    return pd.Series(result.context_mean)[METRICS].astype(float)  # = the 'all' row of pie.evaluate.metrics_table

@@ -23,6 +23,7 @@ With every gate at 0 the weights are equal, and the prediction is the mean train
 
 A prior is any dataset that says how alike two genes are (some figures call priors datasets).
 This repository uses PIE's five genetic knowledge sources: text embeddings of each gene's perturbation description and NCBI annotations, ESM2 protein embeddings, a STRING network embedding, and DepMap gene effects.
+[`3.further_analysis`](../3.further_analysis/) adds five CRISPR screens in primary human T cells, one score per gene each.
 Each gives every gene a vector, and the similarity of two genes is the cosine of their vectors, or the Pearson correlation for DepMap's gene effects.
 Similarities are z-scored over the training pairs, so that a gate means the same thing for every prior, and a pair that a prior does not cover gets 0, the average pair.
 

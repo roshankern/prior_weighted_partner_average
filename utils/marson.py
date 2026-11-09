@@ -1,6 +1,6 @@
 """Marson CD4+ T cells (Zhu et al. 2026) for 3.further_analysis: the pseudobulk responses that
-0.datasets/2.process_perturbseq.ipynb writes, PIE's five priors looked up for Marson's genes, and PWPA fitted once on
-every knockdown."""
+0.datasets/2.process_perturbseq.ipynb writes, PIE's five priors and five T-cell screens looked up for Marson's genes,
+and PWPA fitted once on every knockdown."""
 
 import json
 import sys
@@ -33,11 +33,14 @@ def load():
 
 
 def priors(symbols):
-    """PIE's five genetic sources (1.model/0.build_priors.ipynb), which index genes by symbol, for Marson's ENSG ids.
+    """PIE's five genetic sources and the five T-cell screens (1.model/0.build_priors.ipynb), which index genes by
+    symbol, for Marson's ENSG ids.
     A gene without a symbol, or missing from a source, is uncovered there. Genes stay ENSG ids everywhere else, so two
     ids that shared a symbol would share its rows but remain two genes."""
     name = lambda genes: np.array([symbols.get(g) or "" for g in genes])  # noqa: E731
-    return {n: (lambda a, b, p=p: p(name(a), name(b))) for n, p in pwpa.load_priors(data_dir("priors")).items()}
+    loaded = pwpa.load_priors(data_dir("priors")) | pwpa.load_priors(data_dir("priors", "tcell"))
+    assert len(loaded) == 10, list(loaded)
+    return {n: (lambda a, b, p=p: p(name(a), name(b))) for n, p in loaded.items()}
 
 
 def contexts(obs, delta, rows):

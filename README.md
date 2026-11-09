@@ -9,7 +9,6 @@ Each prior dataset, such as a gene network, a protein embedding or a CRISPR scre
 
 > **Figure 1.** (A) How PWPA is trained. Each prior gets one gate, and the gates weigh the partner average that predicts each training knockdown from the others. Recursive feature elimination (RFE) drops the prior with the smallest gate and refits, and the size is the smallest set whose held-out loss is within one standard error of the fit on all priors.
 > (B) PWPA and the models in PIE's paper on PIE's benchmark of unseen knockdowns in seen contexts (Replogle–Nadig, four cell lines), with PIE's splits and metric code. The first five models are PIE's published values. PWPA uses PIE's five genetic knowledge sources as its priors. Mean over 4 folds ± 1 standard error.
-<!-- TODO(orcd): PWPA in B is K031-pie-five, fitted with the earlier L1 penalty and shuffled decoys; rerun 2.train_test/0.pie_benchmark.ipynb with RFE -->
 
 ## Modules
 
@@ -63,7 +62,7 @@ Set up this repository:
 1. With uv (https://docs.astral.sh/uv/), run `uv sync`. It installs Python 3.12 and the pinned packages.
    Register the notebook kernel: `uv run python -m ipykernel install --user --name pwpa --display-name pwpa`.
 2. Check the model: `uv run python 1.model/pwpa.py` must print "pwpa.py self-check ok".
-3. Set PWPA_DATA_DIR to a folder with room for the downloads (about 350 GB: Perturb-seq data, and 43 GB of PIE's priors).
+3. Set PWPA_DATA_DIR to a folder with room for the downloads (about 525 GB: 413 GB of Perturb-seq data, raw and processed, 42 GB of PIE's priors, and 68 GB of predictions, mostly PIE's checkpoints).
    The default is data/ in the repository, which git ignores.
 4. PIE needs its own environment and a CUDA GPU. Build it, with its `pie` kernel, as in 2.train_test/README.md (Environments).
    It runs 2.train_test/1.train_pie.ipynb, PIE's runs in 2.train_test/4.training_cost.ipynb, and `pie process` in
