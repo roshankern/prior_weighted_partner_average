@@ -3,6 +3,7 @@
 import hashlib
 import http.client
 import os
+import threading
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -20,7 +21,9 @@ def _open(url, first=None, last=None):
 def download(url, path, checksum="", streams=16):
     """Fetch `url` into `path` through `path`.part, in `streams` parallel byte ranges when the server allows them (one
     connection is slow from the cluster's compute nodes). `checksum` is "md5:<hex>", "sha256:<hex>", or empty or "-" for
-    none; a mismatch keeps the .part file and raises. Returns the file's sha256 when no checksum was given."""
+    none; a mismatch keeps the .part file and raises. Returns the file's sha256 when no checksum was given. A stopped
+    download (a failed range, a preempted job) resumes from the .part file and its .progress file, which holds the next
+    byte to fetch of each range."""
     algo, _, digest = checksum.partition(":")
     if "ncbi.nlm.nih.gov" in url:  # NCBI refuses (503) more than a few connections at once
         streams = min(streams, 4)
@@ -34,24 +37,40 @@ def download(url, path, checksum="", streams=16):
             if attempt == 4:
                 raise
             time.sleep(60 * 2**attempt)
-    with open(part, "wb") as f:
-        if size is None:  # no byte ranges: one stream
-            with _open(url) as r:
-                while chunk := r.read(CHUNK):
-                    f.write(chunk)
-        else:
+    if size is None:  # no byte ranges: one stream
+        with open(part, "wb") as f, _open(url) as r:
+            while chunk := r.read(CHUNK):
+                f.write(chunk)
+    else:
+        step = -(-size // streams)
+        starts = range(0, size, step)
+        progress = path.with_name(path.name + ".progress")
+        done, resume = {s: s for s in starts}, False  # range start -> next byte to fetch
+        if part.exists() and progress.exists() and part.stat().st_size == size:
+            saved = dict(tuple(map(int, line.split())) for line in progress.read_text().splitlines())
+            if set(saved) == set(starts):  # not written with another number of streams
+                done, resume = saved, True
+        lock = threading.Lock()
+        with open(part, "r+b" if resume else "wb") as f:
             f.truncate(size)
-            step = -(-size // streams)
 
-            def fetch(first):
-                last = min(first + step, size) - 1
+            def fetch(start):
+                first, last = done[start], min(start + step, size) - 1
                 for attempt in range(8):  # servers drop or refuse (503) some of many connections; resume where it stopped
+                    if first > last:
+                        break
                     try:
                         with _open(url, first, last) as r:
                             assert r.status == 206, (url, r.status)
                             while chunk := r.read(CHUNK):
                                 os.pwrite(f.fileno(), chunk, first)
                                 first += len(chunk)
+                                with lock:
+                                    done[start] = first
+                                    progress.with_suffix(".tmp").write_text("".join(f"{k} {v}\n" for k, v in done.items()))
+                                    progress.with_suffix(".tmp").replace(progress)
+                        if first <= last:  # the server closed the connection cleanly before the end of the range
+                            raise ConnectionError(f"closed at byte {first} of {last}")
                         break
                     except (OSError, http.client.HTTPException) as e:  # URLError, HTTPError, timeouts, cut connections
                         if attempt == 7:
@@ -61,7 +80,8 @@ def download(url, path, checksum="", streams=16):
                 assert first == last + 1, (url, first, last)
 
             with ThreadPoolExecutor(streams) as pool:
-                list(pool.map(fetch, range(0, size, step)))  # list() re-raises a failed range
+                list(pool.map(fetch, starts))  # list() re-raises a failed range
+        progress.unlink()  # complete; a checksum mismatch below then restarts from scratch
     h = hashlib.new(algo if digest else "sha256")
     with open(part, "rb") as f:
         while chunk := f.read(CHUNK):

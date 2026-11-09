@@ -12,9 +12,9 @@ compass_n	spearman_nsig	0.336	0.011	PIE Table 4
 compass_n	spearman_lfc	0.438	0.012	PIE Table 4
 compass_n	discrimination_score_l1	0.645	0.004	PIE Table 4
 presage	binary_auprc	0.091	0.005	PIE Table 4
-presage	sig_jaccard	0.080	0.0045	PIE Table 4
+presage	sig_jaccard	0.08	0.0045	PIE Table 4
 presage	direction_match	0.745	0.011	PIE Table 4
-presage	spearman_nsig	0.370	0.0355	PIE Table 4
+presage	spearman_nsig	0.37	0.0355	PIE Table 4
 presage	spearman_lfc	0.444	0.0125	PIE Table 4
 presage	discrimination_score_l1	0.633	0.007	PIE Table 4
 tabicl	binary_auprc	0.094	0.005	PIE Table 4
@@ -29,9 +29,9 @@ pie	direction_match	0.775	0.011	PIE Table 4
 pie	spearman_nsig	0.525	0.015	PIE Table 4
 pie	spearman_lfc	0.552	0.011	PIE Table 4
 pie	discrimination_score_l1	0.709	0.003	PIE Table 4
-pwpa	binary_auprc	0.332291	0.012109	K031-pie-five
-pwpa	sig_jaccard	0.184216	0.003114	K031-pie-five
-pwpa	direction_match	0.785114	0.005544	K031-pie-five
-pwpa	spearman_nsig	0.593045	0.007252	K031-pie-five
-pwpa	spearman_lfc	0.524875	0.016872	K031-pie-five
-pwpa	discrimination_score_l1	0.704025	0.003011	K031-pie-five
+pwpa	binary_auprc	0.3253059809406599	0.012092681557854456	0.pie_benchmark.ipynb
+pwpa	sig_jaccard	0.1734967716038227	0.007296477640772656	0.pie_benchmark.ipynb
+pwpa	direction_match	0.7820123732089995	0.005887190099716634	0.pie_benchmark.ipynb
+pwpa	spearman_nsig	0.5661581357320149	0.0064912448683814026	0.pie_benchmark.ipynb
+pwpa	spearman_lfc	0.533112237850825	0.020245829574088787	0.pie_benchmark.ipynb
+pwpa	discrimination_score_l1	0.6919803516645611	0.006469921370653934	0.pie_benchmark.ipynb
